@@ -1,34 +1,34 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is to provide access to configuration data used by the Product Search solution accelerator.  You may find this notebook on https://github.com/databricks-industry-solutions/product-search.
+# MAGIC %md このノートブックの目的は、Product Search ソリューション アクセラレータで使用される設定データへのアクセスを提供することです。 このノートブックは https://github.com/databricks-industry-solutions/product-search にあります。
 
 # COMMAND ----------
 
-# MAGIC %md ##Introduction
+# MAGIC %md ##はじめに
 # MAGIC
-# MAGIC The purpose of this solution accelerator is to show how large language models (LLMs) and their smaller brethren can be used to enable product search.  Unlike product search used in most sites today that rely upon keyword matches, LLMs enable what is commonly referred to as a semantic search where the *conceptual similarities* in words come into play.
+# MAGIC このソリューション・アクセラレータの目的は、大規模言語モデル（LLM）とその小さな同胞が、商品検索を可能にするためにどのように使用できるかを示すことです。 今日ほとんどのサイトで使われている、キーワードのマッチに依存する商品検索とは異なり、LLMは一般的にセマンティック検索と呼ばれる、単語の*概念的な類似性*が重要となる検索を可能にします。
 # MAGIC
-# MAGIC A model's knowledge of the *conceptual similarity* between words comes from being exposed to a wide range of documents and from those documents learning that certain words tend to have close relationships to one another.  For example, one document may discuss the importance of play for *children* and use the term *child* teaching the model that *children* and *child* have some kind of relationship.  Other documents may use these terms in similar proximity and other documents discussing the same topics may introduce the term *kid* or *kids*.  It's possible that in some documents all four terms pop-up but even if that never happens, there may be enough overlap in the words surrounding these terms that the model comes to recognize a close association between all these terms.
+# MAGIC 単語間の*概念的類似性*に関するモデルの知識は、様々な文書に触れ、それらの文書から、特定の単語が互いに密接な関係を持つ傾向があることを学習することから得られる。 例えば、ある文書が*子供（Children）*にとっての遊びの重要性を論じ、*子供（Child）*という用語を使うことで、*子供（Children）*と*子供（Child）*には何らかの関係があることをモデルに教えるかもしれません。 他の文書では、これらの用語が似たような近さで使われ、同じトピックを論じる他の文書では、*kid*または*kids*という用語が導入されるかもしれません。 文書によっては4つの用語がすべて出てくる可能性もありますが、たとえそのようなことがなかったとしても、これらの用語を囲む単語には十分な重複があり、モデルはこれらすべての用語の間に密接な関連があると認識するようになります。
 # MAGIC
-# MAGIC Many of the LLMs available from the open source community come available  as pre-trained models where these word associations have already been learned from a wide range of publicly available  information. With the knowledge these models have already accumulated, they can be used to search the descriptive text for products in a product catalog for items that seem aligned with a search term or phrase supplied by a user. Where the products featured on a site tend to use a more specific set of terms that have their own patterns of association reflecting the tone and style of the retailer or the suppliers they feature, these models can be exposed to additional data specific to the site to shape its understanding of the language being used.  This *fine-tuning* exercise can be used to tailor an off-the-shelf model to the nuances of a specific product catalog, enabling even more effective search results.
+# MAGIC オープンソースコミュニティから入手可能なLLMの多くは、事前に学習されたモデルとして提供されており、このような単語の関連は、一般に入手可能な幅広い情報からすでに学習されています。これらのモデルがすでに蓄積している知識を使って、商品カタログの商品説明テキストを検索し、ユーザーが入力した検索語やフレーズと一致すると思われる商品を探すことができます。サイト上で紹介される商品が、小売業者や紹介するサプライヤーのトーンやスタイルを反映した独自の関連パターンを持つ、より具体的な用語のセットを使用する傾向がある場合、これらのモデルは、使用されている言語に対する理解を形成するために、サイトに固有の追加データに触れることができます。 この*ファインチューニング*エクササイズは、既製のモデルを特定の製品カタログのニュアンスに合わせるために使用することができ、より効果的な検索結果を可能にします。
 # MAGIC
-# MAGIC In this solution accelerator, we will show both versions of this pattern using an off-the-shelf model and one tuned to a specific body of product text. We'll then tackle the issues related to model deployment so that users can see how a semantic search capability can easily be deployed through their Databricks environment.
+# MAGIC このソリューションアクセラレータでは、既製のモデルと特定の商品テキストにチューニングしたモデルの両方のバージョンを紹介します。そして、ユーザーがDatabricks環境を通してセマンティック検索機能をどのようにデプロイできるかを確認できるように、モデルのデプロイメントに関する問題に取り組みます。
 # MAGIC </p>
 # MAGIC
-# MAGIC <img src='https://brysmiwasb.blob.core.windows.net/demos/images/search_simple_architecture.png' width=800>
+# MAGIC <img src='https://brysmiwasb.blob.core.windows.net/demos/images/search_simple_architecture.png' width=800></img>
 # MAGIC
-# MAGIC As we explore this, it is important to recognize that you will need to be running in Databricks workspace that supports GPU-based clusters and the Databricks model serving feature.  The availabilty of GPU clusters is dependent upon your cloud provider and quotas assigned to your cloud subscription by that provider.  The avaialblity of Databricks model serving is currently limited to the following [AWS](https://docs.databricks.com/machine-learning/model-serving/index.html#limitations) and [Azure](https://learn.microsoft.com/en-us/azure/databricks/machine-learning/model-serving/#limitations) regions.
+# MAGIC これを探求するにあたり、GPUベースのクラスタとDatabricksのモデル提供機能をサポートするDatabricksワークスペースで実行する必要があることを認識することが重要です。 GPUクラスタの利用可否は、クラウドプロバイダと、そのプロバイダによってクラウドサブスクリプションに割り当てられたクォータに依存します。 Databricks モデルサービング機能のご利用は、現在以下の [AWS](https://docs.databricks.com/machine-learning/model-serving/index.html#limitations) および [Azure](https://learn.microsoft.com/en-us/azure/databricks/machine-learning/model-serving/#limitations) リージョンに限定されています。
 # MAGIC
-# MAGIC **NOTE** Please note that for this solution, you can make use of a single-node cluster.  Be sure to select a GPU-enabled cluster (and a corresponding Databricks ML runtime).  Larger node sizes should give better performance for some of the more intensive steps.
+# MAGIC **注意** このソリューションでは、シングルノードクラスターを利用することができます。 必ずGPU対応クラスタ（および対応するDatabricks MLランタイム）を選択してください。 ノードサイズが大きいほど、より集中的なステップのパフォーマンスが向上します。
 
 # COMMAND ----------
 
-# MAGIC %md ##Configuration
+# MAGIC %md ##設定
 # MAGIC
-# MAGIC The following parameters are used throughout the notebooks to control the resources being used.  If you modify these variables, please note that markdown in the notebooks may refer to the original values associated with these:
+# MAGIC 以下のパラメータは、ノートブック全体で使用されるリソースを制御するために使用されます。 これらの変数を変更した場合、ノートブック内のマークダウンはこれらに関連する元の値を参照する可能性があることに注意してください：
 
 # COMMAND ----------
 
-# DBTITLE 1,Initialize Config Variables
+# DBTITLE 1,設定変数の初期化
 if 'config' not in locals().keys():
   config = {}
 
@@ -56,7 +56,7 @@ config['tuned_model_name'] = 'wands_tuned_search'
 
 # COMMAND ----------
 
-# DBTITLE 1,Databricks url and token
+# DBTITLE 1,DatabricksのURLとトークン
 import os
 ctx = dbutils.notebook.entry_point.getDbutils().notebook().getContext()
 config['databricks token'] = ctx.apiToken().getOrElse(None)

@@ -3,15 +3,15 @@
 [![CLOUD](https://img.shields.io/badge/CLOUD-ALL-blue?logo=googlecloud&style=for-the-badge)](https://cloud.google.com/databricks)
 [![POC](https://img.shields.io/badge/POC-10_days-green?style=for-the-badge)](https://databricks.com/try-databricks)
 
-## LLM Product Search Accelerator
+## LLM製品検索アクセラレーター
 
-The purpose of this solution accelerator is to show how large language models (LLMs) and their smaller brethren can be used to enable product search.  Unlike product search used in most sites today that rely upon keyword matches, LLMs enable what is commonly referred to as a semantic search where the *conceptual similarities* in words come into play.
+このソリューション・アクセラレータの目的は、大規模言語モデル（LLM）とその小さな同胞が、商品検索を可能にするためにどのように使用できるかを示すことです。 今日ほとんどのサイトで使われている、キーワードのマッチに依存する商品検索とは異なり、LLMは一般的にセマンティック検索と呼ばれる、単語の*概念的な類似性*が重要となる検索を可能にします。
 
-A model's knowledge of the *conceptual similarity* between words comes from being exposed to a wide range of documents and from those documents learning that certain words tend to have close relationships to one another.  For example, one document may discuss the importance of play for *children* and use the term *child* teaching the model that *children* and *child* have some kind of relationship.  Other documents may use these terms in similar proximity and other documents discussing the same topics may introduce the term *kid* or *kids*.  It's possible that in some documents all four terms pop-up but even if that never happens, there may be enough overlap in the words surrounding these terms that the model comes to recognize a close association between all these terms.
+単語間の*概念的類似性*に関するモデルの知識は、様々な文書に触れ、それらの文書から、特定の単語が互いに密接な関係を持つ傾向があることを学習することから得られる。 例えば、ある文書が*子供（Children）*にとっての遊びの重要性を論じ、*子供（Child）*という用語を使うことで、*子供（Children）*と*子供（Child）*には何らかの関係があることをモデルに教えるかもしれません。 他の文書では、これらの用語が似たような近さで使われ、同じトピックを論じる他の文書では、*kid*または*kids*という用語が導入されるかもしれません。 文書によっては4つの用語がすべて出てくる可能性もありますが、たとえそのようなことがなかったとしても、これらの用語を囲む単語には十分な重複があり、モデルはこれらすべての用語の間に密接な関連があると認識するようになります。
 
-Many of the LLMs available from the open source community come available  as pre-trained models where these word associations have already been learned from a wide range of publicly available  information. With the knowledge these models have already accumulated, they can be used to search the descriptive text for products in a product catalog for items that seem aligned with a search term or phrase supplied by a user. Where the products featured on a site tend to use a more specific set of terms that have their own patterns of association reflecting the tone and style of the retailer or the suppliers they feature, these models can be exposed to additional data specific to the site to shape its understanding of the language being used.  This *fine-tuning* exercise can be used to tailor an off-the-shelf model to the nuances of a specific product catalog, enabling even more effective search results.
+オープンソースコミュニティから入手可能なLLMの多くは、事前に学習されたモデルとして提供されており、このような単語の関連は、一般に入手可能な幅広い情報からすでに学習されています。これらのモデルがすでに蓄積している知識を使って、商品カタログの商品説明テキストを検索し、ユーザーが入力した検索語やフレーズと一致すると思われる商品を探すことができます。サイト上で紹介される商品が、小売業者や紹介するサプライヤーのトーンやスタイルを反映した独自の関連パターンを持つ、より具体的な用語のセットを使用する傾向がある場合、これらのモデルは、使用されている言語に対する理解を形成するために、サイトに固有の追加データに触れることができます。 この*ファインチューニング*エクササイズは、既製のモデルを特定の製品カタログのニュアンスに合わせるために使用することができ、より効果的な検索結果を可能にします。
 
-In this solution accelerator, we will show both versions of this pattern using an off-the-shelf model and one tuned to a specific body of product text. We'll then tackle the issues related to model deployment so that users can see how a semantic search capability can easily be deployed through their Databricks environment.
+このソリューションアクセラレータでは、既製のモデルと特定の商品テキストにチューニングしたモデルの両方のバージョンを紹介します。そして、ユーザーがDatabricks環境を通してセマンティック検索機能をどのようにデプロイできるかを確認できるように、モデルのデプロイメントに関する問題に取り組みます。
 
 ___
 <tim.lortz@databricks.com> 
@@ -36,22 +36,22 @@ ___
 
 ## Getting started
 
-Although specific solutions can be downloaded as .dbc archives from our websites, we recommend cloning these repositories onto your databricks environment. Not only will you get access to latest code, but you will be part of a community of experts driving industry best practices and re-usable solutions, influencing our respective industries. 
+特定のソリューションはウェブサイトから .dbc アーカイブとしてダウンロードできますが、これらのリポジトリを databricks 環境にクローンすることをお勧めします。最新のコードにアクセスできるだけでなく、業界のベストプラクティスや再利用可能なソリューションを推進する専門家のコミュニティの一員となり、各業界に影響を与えることができます。
 
 <img width="500" alt="add_repo" src="https://user-images.githubusercontent.com/4445837/177207338-65135b10-8ccc-4d17-be21-09416c861a76.png">
 
-To start using a solution accelerator in Databricks simply follow these steps: 
+Databricksでソリューションアクセラレータを使い始めるには、以下の手順に従ってください： 
 
-1. Clone solution accelerator repository in Databricks using [Databricks Repos](https://www.databricks.com/product/repos)
-2. Attach the `RUNME` notebook to any cluster and execute the notebook via Run-All. A multi-step-job describing the accelerator pipeline will be created, and the link will be provided. The job configuration is written in the RUNME notebook in json format. 
-3. Execute the multi-step-job to see how the pipeline runs. 
-4. You might want to modify the samples in the solution accelerator to your need, collaborate with other users and run the code samples against your own data. To do so start by changing the Git remote of your repository  to your organization’s repository vs using our samples repository (learn more). You can now commit and push code, collaborate with other user’s via Git and follow your organization’s processes for code development.
+1. Databricks Repos](https://www.databricks.com/product/repos) を使って Databricks のソリューションアクセラレータリポジトリをクローンする。
+2. RUNME` ノートブックを任意のクラスタにアタッチし、Run-All を使ってノートブックを実行する。アクセラレータパイプラインを記述したマルチステップジョブが作成され、リンクが提供される。ジョブの設定はRUNMEノートブックにjson形式で記述される。
+3. マルチステップジョブを実行して、パイプラインがどのように実行されるかを確認します。
+4. ソリューションアクセラレータのサンプルを自分のニーズに合わせて変更したり、他のユーザーと共同作業したり、自分のデータに対してコードサンプルを実行したりしたくなるかもしれません。そのためには、まず自分のリポジトリのGitリモートを自分の組織のリポジトリに変更することから始めましょう。これで、コードをコミットしてプッシュし、Gitを介して他のユーザーと共同作業し、コード開発のための組織のプロセスに従うことができます。
 
-The cost associated with running the accelerator is the user's responsibility.
+アクセラレーターの実行に関連する費用は、ユーザーの負担となります。
 
 
-## Project support 
+## サポートについて 
 
-Please note the code in this project is provided for your exploration only, and are not formally supported by Databricks with Service Level Agreements (SLAs). They are provided AS-IS and we do not make any guarantees of any kind. Please do not submit a support ticket relating to any issues arising from the use of these projects. The source in this project is provided subject to the Databricks [License](./LICENSE). All included or referenced third party libraries are subject to the licenses set forth below.
+このプロジェクトに含まれるコードは、あくまで参考として提供されるものであり、Databricksによる正式なサービスレベルアグリーメント(SLA)でのサポートはありません。また、Databricksはいかなる保証も行いません。これらのプロジェクトの使用から生じるいかなる問題に関しても、サポートチケットを提出しないでください。このプロジェクトのソースは Databricks [License](./LICENSE) に従って提供されます。含まれる、または参照されるすべてのサードパーティライブラリは、以下に定めるライセンスに従うものとします。
 
-Any issues discovered through the use of this project should be filed as GitHub Issues on the Repo. They will be reviewed as time permits, but there are no formal SLAs for support. 
+このプロジェクトを使用して発見された問題は、GitHub IssuesとしてRepoに提出してください。時間の許す限りレビューされますが、サポートに関する正式なSLAはありません。

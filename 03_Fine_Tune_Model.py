@@ -1,11 +1,15 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is to fine-tune our model for use in the Product Search accelerator.  You may find this notebook on https://github.com/databricks-industry-solutions/product-search.
+# MAGIC %md このノートブックの目的は、Product Searchアクセラレータで使用するモデルを微調整することです。 このノートブックはhttps://github.com/databricks-industry-solutions/product-search
 
 # COMMAND ----------
 
-# MAGIC %md ##Introduction
+# MAGIC %md ##はじめに
 # MAGIC
-# MAGIC Having demonstrated the basics of assembling a model and supporting data to enable a semantic search, we will now focus on fine-tuning the model.  During fine-tuning, the model is fit against a set of data specific to a particular domain, such as our product catalog.  The original knowledge accumulated by our model from its pre-training remains intact but is supplemented with information gleaned from the additional data provided.  Once the model has been tuned to our satisfaction, it is packaged and persisted just like as before.
+# MAGIC 一つ前のノートブックでは、セマンティック検索を実現するために埋め込みモデル(Embedding Model)とサンプルデータを使い、基本的な実装方法を示しました。
+# MAGIC
+# MAGIC 次は埋め込みモデルのファインチューニングを実行します。ファインチューニングにより、埋め込みモデルは特定のドメインに特化したデータセット（例えば、特定の製品カタログなど）に対して最適化されます。なお、モデルが事前学習で得た知識はそのまま残ります、加えて、提供された追加データから得た情報で補完されます。モデルが満足のいくまでチューニングされると、以前と同じようにパッケージ化され、永続化されます。
+# MAGIC
+# MAGIC ファインチューニングは、「教師あり」と「教師なし」の２つのアプローチがあります。本ノートブックでは、両方の実装方法を記載しています。
 
 # COMMAND ----------
 
@@ -35,14 +39,14 @@ import mlflow
 
 # COMMAND ----------
 
-# MAGIC %md ##Step 1: Estimate Baseline Model Performance
+# MAGIC %md ##ステップ1：ベースラインモデルのパフォーマンスを見積もる
 # MAGIC
-# MAGIC In this first step, we'll retrieve the queries and the products returned with each from the WANDS dataset.  For each query-product combination, a numerical score assigned to each combination based on the perceived alignment of the product with the query is retrieved as well:
+# MAGIC まずは、WANDSデータセットから、クエリと、それぞれのクエリで返された商品を取得します。 各クエリと商品の組み合わせについて、クエリと商品の整合性に基づいて割り当てられた数値スコアも取得します：
 
 # COMMAND ----------
 
 # DBTITLE 1,Get Search Results
-# assemble product text relevant to search
+# 検索に関連する製品テキストを組み立てる
 search_pd = (
   spark   
     .table('products')
@@ -68,13 +72,13 @@ display(search_pd)
 
 # COMMAND ----------
 
-# MAGIC %md We will then download the original model used in the last notebook so that we may convert both the queries and the product text information into embeddings:
+# MAGIC %md そして、前回のノートで使用したオリジナルモデルをダウンロードし、クエリと商品テキスト情報の両方を埋め込みに変換できるようにする：
 
 # COMMAND ----------
 
 # DBTITLE 1,Download the Embedding Model
-# download embeddings model
-original_model = SentenceTransformer('all-MiniLM-L12-v2')
+# 埋め込みモデルのダウンロード
+original_model = SentenceTransformer('all-MiniLM-L12-v2', device='cuda:0')
 
 # COMMAND ----------
 
@@ -95,12 +99,12 @@ product_embeddings = (
 
 # COMMAND ----------
 
-# MAGIC %md We can then calculate the cosine similarity between the queries and products associated with them.  While we talk about similarity between embeddings as having to do with the distance between two vectors, cosine similarity refers to the angle separating to rays extending from the center of a space to the point identified by the vector (as if it were a coordinate). In a normalized vector space, this angle also captures the degree of similarity between to points:
+# MAGIC %md そして、クエリと製品間のコサイン類似度を計算します。埋め込み間の類似性は、2つのベクトル間の距離に関係するものとして語られますが、コサイン類似度は、空間の中心からベクトルによって識別される点（あたかも座標であるかのように）へ伸びる光線を区切る角度を指します。正規化されたベクトル空間では、この角度は点間の類似性の度合いも捉えます：
 
 # COMMAND ----------
 
 # DBTITLE 1,Calculate Cosine Similarity Between Queries and Products
-# determine cosine similarity for each query-product pair
+# 各クエリと商品のペアについて、コサイン類似度を決定
 original_cos_sim_scores = (
   util.pairwise_cos_sim(
     query_embeddings, 
@@ -110,92 +114,151 @@ original_cos_sim_scores = (
 
 # COMMAND ----------
 
-# MAGIC %md Averaging these values gives us a sense of how close the queries are to the products in the original embedding space.  Please note that cosine similarity ranges from 0.0 to 1.0 with values improving as they approach 1.0:
+# MAGIC %md これらの値を平均化することで、クエリが元の埋め込み空間のプロダクトにどれだけ近いかを知ることができます。 コサイン類似度の範囲は0.0から1.0であり、1.0に近づくにつれて値が向上することに注意してください：
 
 # COMMAND ----------
 
 # DBTITLE 1,Calculate Avg Cosine Similarity
-# average the cosine similarity scores
+# コサイン類似度の平均スコア
 original_cos_sim_score = torch.mean(original_cos_sim_scores).item()
 
-# display result
+# 結果表示
 print(original_cos_sim_score)
 
 # COMMAND ----------
 
-# MAGIC %md Examining the correlation between the label scores and the cosine similarity can provide us another measure of the model's performance: 
+# MAGIC %md ラベルスコアとコサイン類似度の相関を調べることで、モデルの性能の別の尺度が得られます： 
 
 # COMMAND ----------
 
 # DBTITLE 1,Calculate Correlation with Scores 
-# determine correlation between cosine similarities and relevancy scores
+# コサイン類似度と関連性スコアの相関を決定
 original_corr_coef_score = (
   np.corrcoef(
     original_cos_sim_scores,
     search_pd['score'].values
   )[0][1]
 ) 
-# print results
+# 結果表示
 print(original_corr_coef_score)
 
 # COMMAND ----------
 
-# MAGIC %md ##Step 2: Fine-Tune the Model
+# MAGIC %md ##ステップ2：モデルのファインチューニング
 # MAGIC
-# MAGIC With a baseline measurement of the original model's performance in-hand, we can now fine-tune it using our annotated search result data.  We will start by restructuring our query results into a list of inputs as required by the model:
+# MAGIC オリジナルモデルのパフォーマンスのベースラインのメトリックスが分かったので、次はアノテーションされた検索結果データを使ってモデルをファインチューニングすることができます。 まず、クエリ結果をモデルが必要とする入力リスト形式に再構築することから始めます：
+
+# COMMAND ----------
+
+# MAGIC %md ###ステップ2-A：教師あり学習編
+# MAGIC
+# MAGIC まずは教師あり学習のアプローチから：
 
 # COMMAND ----------
 
 # DBTITLE 1,Restructure Data for Model Input
-# define function to assemble an input
+# 入力を組み立てる関数を定義
 def create_input(doc1, doc2, score):
   return InputExample(texts=[doc1, doc2], label=score)
 
-# convert each search result into an input
+# 各検索結果を入力に変換
 inputs = search_pd.apply(
   lambda s: create_input(s['query'], s['product_text'], s['score']), axis=1
   ).to_list()
 
 # COMMAND ----------
 
-# MAGIC %md We will then download a separate copy of our original model so that we may tune it:
+# MAGIC %md その後、チューニングするために、オリジナルモデルの別コピーをダウンロードします：
 
 # COMMAND ----------
 
 # DBTITLE 1,Download the Embedding Model
-tuned_model = SentenceTransformer('all-MiniLM-L12-v2')
+tuned_model = SentenceTransformer('all-MiniLM-L12-v2', device='cuda:0')
 
 # COMMAND ----------
 
-# MAGIC %md And we will then tune the model to minimize cosine similarity distances:
+# MAGIC %md そして、コサイン類似度を最小化するようにモデルをチューニングします：
 # MAGIC
-# MAGIC **NOTE** This step will run faster by scaling up the server used for your single-node cluster.
+# MAGIC **注意** このステップは、シングルノードクラスターに使用するサーバーをスケールアップすることで、より高速に実行されます。
 
 # COMMAND ----------
 
 # DBTITLE 1,Tune the Model
-# define instructions for feeding inputs to model
+# モデルへの入力指示を定義
 input_dataloader = DataLoader(inputs, shuffle=True, batch_size=16) # feed 16 records at a time to the model
 
-# define loss metric to optimize for
+# 最適化する損失指標を定義
 loss = losses.CosineSimilarityLoss(tuned_model)
 
-# tune the model on the input data
+# 入力データに対してモデルをチューニング
 tuned_model.fit(
   train_objectives=[(input_dataloader, loss)],
-  epochs=1, # just make 1 pass over data
-  warmup_steps=100 # controls how many steps over which learning rate increases to max before descending back to zero
+  epochs=1, # テストのためEpochは１に設定
+  warmup_steps=100 # 学習率が最大まで上昇してからゼロに戻るまでのステップ数を制御
   )
 
 # COMMAND ----------
 
-# MAGIC %md During model fitting, you will notice we are setting the model to perform just one pass (epoch) over the data.  We will actually see pretty sizeable improvements from this process, but we may wish to increase that value to get multiple passes if we want to explore getting more.  The setting for *warmup_steps* is just a common one used in this space.  Feel free to experiment with other values or take the default.
+# MAGIC %md モデルトレーニングの間、データに対して1パス（エポック）だけ実行するようにモデルを設定していることにお気づきでしょう。 この処理によって、実際にかなりの改善が見られますが、より多くの改善を求めるのであれば、この値を大きくして複数回のパスを行うこともできます。 *warmup_steps*の設定は、この領域でよく使われるものです。 他の値で実験するのも、デフォルトを使うのも自由です。
 
 # COMMAND ----------
 
-# MAGIC %md ##Step 3: Estimate Fine-Tuned Model Performance
+# MAGIC %md ###ステップ2-B：教師なし学習編
 # MAGIC
-# MAGIC With our model tuned, we can assess it's performance just like we did before:
+# MAGIC 続いて教師なし学習のアプローチです：
+
+# COMMAND ----------
+
+# DBTITLE 1,Restructure Data for Model Input
+# 入力を組み立てる関数を定義
+def create_input_without_label(doc1, doc2):
+  return InputExample(texts=[doc1, doc2])
+
+# 各検索結果を入力に変換
+inputs_without_label = search_pd.apply(
+  lambda s: create_input_without_label(s['query'], s['product_text']), axis=1
+  ).to_list()
+
+# COMMAND ----------
+
+# MAGIC %md その後、チューニングするために、オリジナルモデルの別コピーをダウンロードします：
+
+# COMMAND ----------
+
+# DBTITLE 1,Download the Embedding Model
+tuned_model = SentenceTransformer('all-MiniLM-L12-v2', device='cuda:0')
+
+# COMMAND ----------
+
+# MAGIC %md そして、コサイン類似度を最小化するようにモデルをチューニングします：
+# MAGIC
+# MAGIC **注意** このステップは、シングルノードクラスターに使用するサーバーをスケールアップすることで、より高速に実行されます。
+
+# COMMAND ----------
+
+# DBTITLE 1,Tune the Model
+# モデルへの入力指示を定義
+input_without_label_dataloader = DataLoader(inputs_without_label, shuffle=True, batch_size=16) # feed 16 records at a time to the model
+
+# 最適化する損失指標を定義
+loss = losses.MultipleNegativesRankingLoss(tuned_model)
+
+# 入力データに対してモデルをチューニング
+tuned_model.fit(
+  train_objectives=[(input_without_label_dataloader, loss)],
+  epochs=1, # テストのためEpochは１に設定
+  warmup_steps=100 # 学習率が最大まで上昇してからゼロに戻るまでのステップ数を制御
+  )
+
+# COMMAND ----------
+
+# MAGIC %md モデルトレーニングの間、データに対して1パス（エポック）だけ実行するようにモデルを設定していることにお気づきでしょう。 実はこのデータセットでは教師なしでは１エポックだと期待通りの結果が得れないことがわかると思います。より多くの改善を求めるのであれば、この値を大きくして複数回のパスを行うことをお試しください。 *warmup_steps*の設定は、この領域でよく使われるものです。 他の値で実験するのも、デフォルトを使うのも自由です。
+
+# COMMAND ----------
+
+# MAGIC %md ##ステップ3：微調整されたモデルのパフォーマンスを見積もる
+# MAGIC
+# MAGIC モデルが調整されたので、前と同じようにそのパフォーマンスを評価することができます：
 
 # COMMAND ----------
 
@@ -214,7 +277,7 @@ product_embeddings = (
       )
   )
 
-# determine cosine similarity for each query-product pair
+# 各クエリと商品のペアについて、コサイン類似度を算出
 tuned_cos_sim_scores = (
   util.pairwise_cos_sim(
     query_embeddings, 
@@ -246,13 +309,13 @@ print(f"With tuning, the correlation coefficient went from {original_corr_coef_s
 
 # COMMAND ----------
 
-# MAGIC %md We can see from these results that with just a single pass over the data, we've brought the queries closer together with our products, tuning the model to the particulars of our data.  
+# MAGIC %md これらの結果から、たった一度のデータ処理で、クエリーを製品に近づけ、モデルをデータの特殊性に合わせてチューニングしたことがわかります。 
 
 # COMMAND ----------
 
-# MAGIC %md ##Step 4: Persist Model for Deployment
+# MAGIC %md ##ステップ4：デプロイのためにモデルを永続化する
 # MAGIC
-# MAGIC Just like before, we can package our tuned model with our data to enable its persistence (and eventual deployment).  The following steps are presented just as they are in the previous notebook with minor adjustments to separate our original assets from the tuned assets:
+# MAGIC 前回と同じように、チューニングしたモデルをデータとともにパッケージ化し、永続化（そして最終的なデプロイ）を可能にします。 以下のステップは、前のノートブックと同じように、オリジナルのアセットとチューニングされたアセットを分離するために微調整を加えたものです：
 
 # COMMAND ----------
 

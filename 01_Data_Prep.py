@@ -1,27 +1,27 @@
 # Databricks notebook source
-# MAGIC %md The purpose of this notebook is to prepare the data for the Product Search solution accelerator.  You may find this notebook on https://github.com/databricks-industry-solutions/product-search.
+# MAGIC %md このノートの目的は、Product Search ソリューション・アクセラレータ用のデータを準備することです。 このノートはhttps://github.com/databricks-industry-solutions/product-search
 
 # COMMAND ----------
 
-# MAGIC %md ##Introduction
+# MAGIC %md ##はじめに
 # MAGIC
-# MAGIC In this notebook, we will access the [Wayfair Annotation Dataset (WANDS)](https://www.aboutwayfair.com/careers/tech-blog/wayfair-releases-wands-the-largest-and-richest-publicly-available-dataset-for-e-commerce-product-search-relevance), made accessible by [Wayfair](https://www.wayfair.com/) under an MIT License.
+# MAGIC このノートブックでは、[Wayfair](https://www.wayfair.com/)がMITライセンスの下で公開している[Wayfair Annotation Dataset (WANDS)](https://www.aboutwayfair.com/careers/tech-blog/wayfair-releases-wands-the-largest-and-richest-publicly-available-dataset-for-e-commerce-product-search-relevance)にアクセスします。
 # MAGIC
-# MAGIC The dataset consists of three file types:
+# MAGIC このデータセットは3種類のファイルから構成されています：
 # MAGIC </p>
 # MAGIC
-# MAGIC * Product - 42,000+ products features on the Wayfair website
-# MAGIC * Query - 480 customer queries used for product searches
-# MAGIC * Label - 233,000+ product results for the provided queries labeled for relevance
+# MAGIC * Product - Wayfairのウェブサイトに掲載されている42,000以上の商品
+# MAGIC * Query - 商品検索に使用された480の顧客クエリ
+# MAGIC * Label - 提供されたクエリに対する233,000以上の商品結果
 # MAGIC
-# MAGIC In the [Annotations Guidelines document](https://github.com/wayfair/WANDS/blob/main/Product%20Search%20Relevance%20Annotation%20Guidelines.pdf) that accompanies the dataset, Wayfair addresses the methods by which queries were labeled.  The three labels assigned to any query result are:
+# MAGIC データセットに付随する[Annotations Guidelines document](https://github.com/wayfair/WANDS/blob/main/Product%20Search%20Relevance%20Annotation%20Guidelines.pdf)において、Wayfairはクエリのラベル付け方法について言及しています。 クエリ結果に割り当てられたラベルは以下の3つです：
 # MAGIC </p>
 # MAGIC
-# MAGIC * Exact match - this label represents the surfaced product fully matches the search query
-# MAGIC * Partial match - this label represents the surfaced product does not fully match the search query
-# MAGIC * Irrelevant - this label indicates the product is not relevant to the query
+# MAGIC * 完全一致(Exact) - このラベルは、検索クエリに完全に一致する商品を表します。
+# MAGIC * 部分一致(Partial) - このラベルは、検索クエリに完全に一致しないことを表します。
+# MAGIC * 無関係(Irrelevant) - このラベルは、製品がクエリに無関係であることを示します。
 # MAGIC
-# MAGIC As explained in the document, there is a bit of subjectivity in assigning these labels but the goal here is not to capture ground truth but instead to capture informed human judgement.
+# MAGIC ドキュメントで説明されているように、これらのラベルの割り当てには若干の主観が入りますが、ここでのゴールは、真実を把握することではなく、情報に基づいた人間の判断を把握することです。
 
 # COMMAND ----------
 
@@ -38,9 +38,9 @@ import os
 
 # COMMAND ----------
 
-# MAGIC %md ##Step 1: Download Dataset Files
+# MAGIC %md ##ステップ 1: データセットファイルのダウンロード
 # MAGIC
-# MAGIC In this step, we will download the dataset files to a directory accessible within the Databricks workspace:
+# MAGIC このステップでは、データセットファイルをDatabricksワークスペース内でアクセス可能なディレクトリにダウンロードします：
 
 # COMMAND ----------
 
@@ -72,9 +72,9 @@ os.environ['WANDS_DOWNLOADS_PATH'] = '/dbfs'+ config['dbfs_path'] + '/downloads'
 
 # COMMAND ----------
 
-# MAGIC %md ##Step 2: Write Data to Tables
+# MAGIC %md ##ステップ2：データをテーブルに書き込む
 # MAGIC
-# MAGIC In this step, we will read data from each of the previously downloaded files and write the data to tables that will make subsequent access easier and faster:
+# MAGIC このステップでは、以前にダウンロードした各ファイルからデータを読み込み、その後のアクセスをより簡単かつ高速にするために、データをテーブルに書き込みます：
 
 # COMMAND ----------
 
@@ -110,6 +110,11 @@ _ = (
 display(
   spark.table('products')
   )
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT product_class, count(*) AS count FROM products GROUP BY product_class ORDER BY count ASC
 
 # COMMAND ----------
 
@@ -170,11 +175,16 @@ display(spark.table('labels'))
 
 # COMMAND ----------
 
-# MAGIC %md ##Step 3: Assign Label Scores
+# MAGIC %sql
+# MAGIC SELECT label FROM labels GROUP BY label
+
+# COMMAND ----------
+
+# MAGIC %md ##ステップ3：ラベルスコアの割り当て
 # MAGIC
-# MAGIC To prepare the text-based labels assigned to products returned by a query for use in our algorithm, we'll convert the labels to numerical scores based our judgement of how these labels should be weighted:
+# MAGIC クエリによって返された商品に割り当てられたテキストベースのラベルをアルゴリズムで使用するために準備するために、これらのラベルがどのように重み付けされるべきかの判断に基づいてラベルを数値スコアに変換する：
 # MAGIC
-# MAGIC **NOTE** [This article](https://medium.com/@nikhilbd/how-to-measure-the-relevance-of-search-engines-18862479ebc) provides a nice discussion of how to approach the scoring of search results for relevance should you wish to explore alternative scoring patterns. 
+# MAGIC **NOTE** [この記事](https://medium.com/@nikhilbd/how-to-measure-the-relevance-of-search-engines-18862479ebc)では、検索結果の関連性のスコアリングのアプローチ方法に関する素晴らしい議論を提供している。
 
 # COMMAND ----------
 
